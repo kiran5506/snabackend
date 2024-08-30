@@ -17,7 +17,7 @@ const authenticateJWT = (req, res, next) => {
             if (err) return res.status(500).json({ message: 'Server error' });
             if (blacklisted) return res.status(403).json({ message: 'Token is blacklisted' });
             jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-                if (err) return res.status(403).json({ message: 'Forbidden' });
+                if (err) return res.status(403).json({ status:409, message: 'token is invalid' });
                 req.user = user;
                 next();
             });

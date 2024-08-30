@@ -4,13 +4,39 @@ const bodyParser = require('body-parser');
 const db = require('./config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const {generateOTP} = require('./utils/common');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
+const {generateOTP} = require('./utils/common');
 const authenticateJWT = require('./middleware/authToken')
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.use(express.json());
+//app.use(express.json());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use("/images", express.static('src/uploads'));
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(__dirname, 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir);
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      cb(null, Date.now() + path.extname(file.originalname)); // Add timestamp to filename to avoid conflicts
+    }
+});
+
+const upload = multer({ storage: storage });
+
+const userRoutes = require('./routes/userRoutes');
+const policyRoutes = require('./routes/policyRoutes');
+const contactRouters = require('./routes/contactRouters');
+const settingsRouters = require('./routes/settingsRouters');
 
 /** User Register */
 app.post('/register', async (req, res, next) => {
@@ -59,12 +85,11 @@ app.post('/login', (req, res, next) => {
         const user = results[0];
         try{
             const otp = generateOTP();
-            console.log('otp-->', otp);
             const sqlQuery2 = 'UPDATE users SET  otp = ? WHERE user_id = ?';
             db.query(sqlQuery2, [otp, user.user_id], async(err, results) => {
                 if (err) return res.status(500).json(err);
             })
-            res.status(201).json({ id: user.user_id, message: "OTP sent to mobile number please verify" });
+            res.status(201).json({ id: user.user_id, message: "OTP sent to mobile number please verify", "OTP": otp });
             /*const match = await bcrypt.compare(password, user.password);
             if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
@@ -109,9 +134,14 @@ app.post('/logout', authenticateJWT, (req, res) => {
     })
 })
 
-
 // Users
-app.use('/api/users', authenticateJWT, require('./routes/userRoutes'));
+app.use('/api/users', authenticateJWT, userRoutes);
+app.use('/api/common', upload.single('image'), policyRoutes);
+app.use('/api/contactus', contactRouters);
+app.use('/api/settings', upload.fields([
+    { name: 'header_logo', maxCount: 1 },
+    { name: 'footer_logo', maxCount: 1 }
+]), settingsRouters);
 
 app.listen(PORT, () => {
     console.log(`Surver running on port ${PORT}`)

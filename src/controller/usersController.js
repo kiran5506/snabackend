@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 
 const userGetById = async (req, res, next) => {
     const userId = req.params.id;
-    const sql = 'SELECT * FROM users WHERE user_id = ?';
+    const sql = 'SELECT u.*,r.role_type FROM users u LEFT JOIN roles r ON u.role_id=r.role_id WHERE u.user_id = ?';
     db.query(sql, [userId], (err, results) => {
         if (err) return res.status(500).json(err);
         if (results.length === 0) return res.status(404).json({ message: 'User not found' });
